@@ -11,6 +11,8 @@
 
 ## Why COM? Why Live Editing?
 
+[COM (Component Object Model)](https://learn.microsoft.com/en-us/windows/win32/com/component-object-model--com--portal) is a Windows OS-level protocol that Microsoft Office was built around since the 1990s. Every single Office feature — from formatting a cell to inserting a chart — is exposed via COM. It's the same API that VBA macros use internally, which means **if you can do it in PowerPoint, you can automate it via COM**.
+
 Most PowerPoint automation tools work on **files** — they read a `.pptx`, generate a new one, and overwrite. This means:
 
 - ❌ You must **close PowerPoint** before editing
