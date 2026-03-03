@@ -25,6 +25,77 @@ Most PowerPoint automation tools work on **files** — they read a `.pptx`, gene
 - ✅ **Interactive workflow** — tweak, preview, tweak again
 - ✅ **Full PowerPoint fidelity** — animations, transitions, masters, themes all preserved
 
+## How It Works
+
+### Architecture: MCP ↔ COM ↔ PowerPoint
+
+```mermaid
+sequenceDiagram
+    participant User as 👤 User / LLM Agent
+    participant MCP as 🔌 MCP Client<br/>(VS Code / Claude)
+    participant Server as 🖥️ pptx-mcp-live<br/>(Python + FastMCP)
+    participant COM as ⚙️ COM / pywin32
+    participant PPT as 📊 PowerPoint<br/>(Running Instance)
+
+    User->>MCP: "Make the title bigger on slide 2"
+    MCP->>Server: MCP tool call: format_text(slide=2, shape="Title 1", font_size=36)
+    Server->>COM: shape.TextFrame.TextRange.Font.Size = 36
+    COM->>PPT: Modify shape in-memory (no file I/O)
+    PPT-->>User: 👁️ User sees change instantly in PowerPoint
+    Server-->>MCP: {"success": true, "changes": ["size=36"]}
+    MCP-->>User: "Title font size updated to 36pt"
+```
+
+### Human-in-the-Loop Review Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent as 🤖 LLM Agent
+    participant MCP as 🔌 MCP Server
+    participant PPT as 📊 PowerPoint
+    participant Human as 👤 Human Reviewer
+
+    Note over Agent,PPT: Phase 1: Agent creates slides
+    Agent->>MCP: add_slide, set_shape_text, add_chart, format_text...
+    MCP->>PPT: COM: create slides with content
+
+    Note over Human,PPT: Phase 2: Human reviews in PowerPoint
+    Human->>PPT: Opens presentation, reviews slides
+    Human->>PPT: Adds comments: "Move chart right", "Title too small"
+
+    Note over Agent,PPT: Phase 3: Agent reads & applies feedback
+    Agent->>MCP: get_comments(slide_index=2)
+    MCP->>PPT: COM: read slide.Comments
+    MCP-->>Agent: [{text: "Move chart right"}, {text: "Title too small"}]
+    Agent->>MCP: move_shape(2, "Chart 1", left_inches=6.0)
+    Agent->>MCP: format_text(2, "Title 1", font_size=36)
+    Agent->>MCP: delete_comment(2, 1)
+    MCP->>PPT: COM: apply changes, remove resolved comments
+
+    Note over Agent,PPT: Phase 4: Agent verifies visually
+    Agent->>MCP: capture_slide(2)
+    MCP->>PPT: COM: slide.Export() → base64 PNG
+    MCP-->>Agent: 🖼️ base64 image of slide
+    Agent->>Agent: Evaluate: "Layout looks good ✓"
+```
+
+### COM vs File-Based: Side-by-Side
+
+```mermaid
+graph LR
+    subgraph "❌ File-Based (python-pptx)"
+        A[Read .pptx file] --> B[Parse XML]
+        B --> C[Modify in memory]
+        C --> D[Write new .pptx]
+        D --> E[Close & reopen PPT]
+    end
+
+    subgraph "✅ COM-Based (pptx-mcp-live)"
+        F[Connect to running PPT] --> G[Modify shape directly]
+        G --> H[Change visible instantly]
+    end
+```
+
 ## Why Comments Matter (Human-in-the-Loop)
 
 This server includes **comment tools** (add, get, delete) because comments enable a powerful **human-in-the-loop workflow**:
