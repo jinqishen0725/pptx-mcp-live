@@ -25,9 +25,20 @@ Most PowerPoint automation tools work on **files** — they read a `.pptx`, gene
 - ✅ **Interactive workflow** — tweak, preview, tweak again
 - ✅ **Full PowerPoint fidelity** — animations, transitions, masters, themes all preserved
 
-## How It Works
+```mermaid
+graph LR
+    subgraph "❌ File-Based (python-pptx)"
+        A[Read .pptx file] --> B[Parse XML]
+        B --> C[Modify in memory]
+        C --> D[Write new .pptx]
+        D --> E[Close & reopen PPT]
+    end
 
-### Architecture: MCP ↔ COM ↔ PowerPoint
+    subgraph "✅ COM-Based (pptx-mcp-live)"
+        F[Connect to running PPT] --> G[Modify shape directly]
+        G --> H[Change visible instantly]
+    end
+```
 
 ```mermaid
 sequenceDiagram
@@ -46,7 +57,19 @@ sequenceDiagram
     MCP-->>User: "Title font size updated to 36pt"
 ```
 
-### Human-in-the-Loop Review Flow
+## Why Comments Matter (Human-in-the-Loop)
+
+This server includes **comment tools** (add, get, delete) because comments enable a powerful **human-in-the-loop workflow**:
+
+### Workflow 1: Agent Creates → Human Reviews → Agent Revises
+
+1. **Agent creates slides** using the MCP tools (add slides, text, charts, images)
+2. **Human opens PowerPoint** and reviews the slides visually
+3. **Human adds comments** directly on shapes/slides: *"Make title bigger"*, *"Move chart to the right"*, *"Change color to match brand"*
+4. **Agent reads comments** via `get_comments` and applies the requested changes
+5. **Agent resolves/deletes comments** after addressing them
+
+This is **much easier** than typing all feedback into a chat box. You can point at exactly what you want changed, right in the presentation.
 
 ```mermaid
 sequenceDiagram
@@ -78,37 +101,6 @@ sequenceDiagram
     MCP-->>Agent: 🖼️ base64 image of slide
     Agent->>Agent: Evaluate: "Layout looks good ✓"
 ```
-
-### COM vs File-Based: Side-by-Side
-
-```mermaid
-graph LR
-    subgraph "❌ File-Based (python-pptx)"
-        A[Read .pptx file] --> B[Parse XML]
-        B --> C[Modify in memory]
-        C --> D[Write new .pptx]
-        D --> E[Close & reopen PPT]
-    end
-
-    subgraph "✅ COM-Based (pptx-mcp-live)"
-        F[Connect to running PPT] --> G[Modify shape directly]
-        G --> H[Change visible instantly]
-    end
-```
-
-## Why Comments Matter (Human-in-the-Loop)
-
-This server includes **comment tools** (add, get, delete) because comments enable a powerful **human-in-the-loop workflow**:
-
-### Workflow 1: Agent Creates → Human Reviews → Agent Revises
-
-1. **Agent creates slides** using the MCP tools (add slides, text, charts, images)
-2. **Human opens PowerPoint** and reviews the slides visually
-3. **Human adds comments** directly on shapes/slides: *"Make title bigger"*, *"Move chart to the right"*, *"Change color to match brand"*
-4. **Agent reads comments** via `get_comments` and applies the requested changes
-5. **Agent resolves/deletes comments** after addressing them
-
-This is **much easier** than typing all feedback into a chat box. You can point at exactly what you want changed, right in the presentation.
 
 ### Workflow 2: Agent-Assisted Review
 
