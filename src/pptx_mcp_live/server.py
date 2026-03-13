@@ -1,6 +1,6 @@
 """PowerPoint MCP Live Server — COM-based live editing for PowerPoint.
 
-35 tools for real-time PowerPoint automation on Windows.
+43 tools for real-time PowerPoint automation on Windows.
 """
 
 import asyncio
@@ -10,7 +10,58 @@ from typing import Any, Dict, List, Optional
 from mcp.server.fastmcp import FastMCP
 
 from .core.errors import ToolError
-from .tools import *
+from .tools import (
+    # inspection
+    get_slide_info_sync,
+    inspect_presentation_sync,
+    list_open_presentations_sync,
+    list_slide_layouts_sync,
+    # readers
+    get_comments_sync,
+    read_shape_text_sync,
+    read_slide_notes_sync,
+    read_slide_text_sync,
+    # writers
+    add_slide_sync,
+    add_text_box_sync,
+    delete_slide_sync,
+    duplicate_slide_sync,
+    reorder_slide_sync,
+    set_shape_text_sync,
+    set_slide_notes_sync,
+    # formatters
+    format_shape_sync,
+    format_text_sync,
+    set_slide_background_sync,
+    # layout
+    add_shape_sync,
+    align_shapes_sync,
+    arrange_shape_sync,
+    delete_shape_sync,
+    distribute_shapes_sync,
+    group_shapes_sync,
+    move_shape_sync,
+    resize_shape_sync,
+    rotate_shape_sync,
+    set_slide_layout_sync,
+    # media
+    add_chart_sync,
+    add_image_sync,
+    add_table_sync,
+    # export
+    capture_slide_sync,
+    export_pdf_sync,
+    export_slide_image_sync,
+    # comments
+    add_comment_sync,
+    delete_comment_sync,
+    get_all_comments_sync,
+    reply_to_comment_sync,
+    # advanced
+    close_presentation_sync,
+    find_replace_sync,
+    save_presentation_sync,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,17 +77,18 @@ mcp = FastMCP(
     ==========================
     COM-based live editing for Microsoft PowerPoint on Windows.
     
-    35 tools for:
-    - Inspecting presentations and slides
+    43 tools for:
+    - Inspecting presentations, slides, and available layouts
     - Reading/writing text, notes, shapes
-    - Adding/deleting/reordering slides
-    - Formatting text and shapes
-    - Position, size, alignment, rotation of shapes
-    - Adding images, tables, charts
+    - Adding/deleting/reordering slides and shapes
+    - Formatting text (whole shape or per-paragraph) and shapes
+    - Position, size, alignment, rotation of shapes (including placeholders)
+    - Adding images, tables, charts, and auto shapes (arrows, rectangles, etc.)
     - Exporting slides as images/PDF
     - Visual feedback via capture_slide (base64 PNG)
-    - Comments: add, delete
+    - Comments: add, delete, reply, get all across slides
     - Find/replace across slides
+    - Close presentations programmatically
     
     Prerequisites:
     - Windows OS (required for COM automation)
@@ -74,13 +126,24 @@ async def inspect_presentation(presentation_name: Optional[str] = None) -> dict:
 
 @mcp.tool()
 async def get_slide_info(slide_index: int, presentation_name: Optional[str] = None) -> dict:
-    """Get all shapes on a slide with type, text, position, size.
+    """Get all shapes on a slide with type, text, position, size, and font details.
     
     Args:
         slide_index: 1-based slide number.
     """
     try:
         return await asyncio.to_thread(get_slide_info_sync, slide_index, presentation_name)
+    except Exception as e:
+        if isinstance(e, ToolError): raise
+        raise ToolError(f"Failed: {e}") from e
+
+@mcp.tool()
+async def list_slide_layouts(presentation_name: Optional[str] = None) -> dict:
+    """List all available slide layouts with names, indices, and placeholder counts.
+    Use this to find the right layout_index for add_slide or set_slide_layout.
+    """
+    try:
+        return await asyncio.to_thread(list_slide_layouts_sync, presentation_name)
     except Exception as e:
         if isinstance(e, ToolError): raise
         raise ToolError(f"Failed: {e}") from e
@@ -127,6 +190,15 @@ async def get_comments(slide_index: int, presentation_name: Optional[str] = None
     """Get all comments from a slide with author, text, position."""
     try:
         return await asyncio.to_thread(get_comments_sync, slide_index, presentation_name)
+    except Exception as e:
+        if isinstance(e, ToolError): raise
+        raise ToolError(f"Failed: {e}") from e
+
+@mcp.tool()
+async def get_all_comments(presentation_name: Optional[str] = None) -> dict:
+    """Get all comments from ALL slides in one call. Returns comments grouped by slide."""
+    try:
+        return await asyncio.to_thread(get_all_comments_sync, presentation_name)
     except Exception as e:
         if isinstance(e, ToolError): raise
         raise ToolError(f"Failed: {e}") from e
@@ -216,16 +288,17 @@ async def add_text_box(slide_index: int, text: str, left_inches: float = 1.0, to
 # ============================================================================
 
 @mcp.tool()
-async def format_text(slide_index: int, shape_ref: str, bold: Optional[bool] = None, italic: Optional[bool] = None, underline: Optional[bool] = None, font_name: Optional[str] = None, font_size: Optional[float] = None, font_color: Optional[str] = None, alignment: Optional[str] = None, presentation_name: Optional[str] = None) -> dict:
+async def format_text(slide_index: int, shape_ref: str, bold: Optional[bool] = None, italic: Optional[bool] = None, underline: Optional[bool] = None, font_name: Optional[str] = None, font_size: Optional[float] = None, font_color: Optional[str] = None, alignment: Optional[str] = None, paragraph_index: Optional[int] = None, presentation_name: Optional[str] = None) -> dict:
     """Format text in a shape: bold, italic, font, size, color, alignment.
     
     Args:
         font_color: "#RRGGBB" hex color.
         alignment: "left", "center", "right", "justify".
+        paragraph_index: 1-based paragraph number. None = format ALL text in the shape.
     """
     try:
         ref = int(shape_ref) if shape_ref.isdigit() else shape_ref
-        return await asyncio.to_thread(format_text_sync, slide_index, ref, bold, italic, underline, font_name, font_size, font_color, alignment, presentation_name)
+        return await asyncio.to_thread(format_text_sync, slide_index, ref, bold, italic, underline, font_name, font_size, font_color, alignment, paragraph_index, presentation_name)
     except Exception as e:
         if isinstance(e, ToolError): raise
         raise ToolError(f"Failed: {e}") from e
@@ -326,6 +399,52 @@ async def group_shapes(slide_index: int, shape_names: List[str], ungroup: bool =
         if isinstance(e, ToolError): raise
         raise ToolError(f"Failed: {e}") from e
 
+@mcp.tool()
+async def delete_shape(slide_index: int, shape_ref: str, presentation_name: Optional[str] = None) -> dict:
+    """Delete a shape from a slide by name or index.
+    
+    Args:
+        shape_ref: Shape name (e.g. "TextBox 3") or index as string (e.g. "3").
+    """
+    try:
+        ref = int(shape_ref) if shape_ref.isdigit() else shape_ref
+        return await asyncio.to_thread(delete_shape_sync, slide_index, ref, presentation_name)
+    except Exception as e:
+        if isinstance(e, ToolError): raise
+        raise ToolError(f"Failed: {e}") from e
+
+@mcp.tool()
+async def add_shape(slide_index: int, shape_type: str, left_inches: float = 1.0, top_inches: float = 1.0, width_inches: float = 2.0, height_inches: float = 1.0, text: Optional[str] = None, fill_color: Optional[str] = None, line_color: Optional[str] = None, presentation_name: Optional[str] = None) -> dict:
+    """Add an auto shape (rectangle, arrow, oval, etc.) to a slide.
+    
+    Args:
+        shape_type: rectangle, rounded_rectangle, oval, triangle, diamond,
+            right_arrow, left_arrow, up_arrow, down_arrow, star_5, heart,
+            cross, chevron, hexagon, pentagon, and more.
+        text: Optional text inside the shape.
+        fill_color: Fill color as "#RRGGBB".
+        line_color: Border color as "#RRGGBB".
+    """
+    try:
+        return await asyncio.to_thread(add_shape_sync, slide_index, shape_type, left_inches, top_inches, width_inches, height_inches, text, fill_color, line_color, presentation_name)
+    except Exception as e:
+        if isinstance(e, ToolError): raise
+        raise ToolError(f"Failed: {e}") from e
+
+@mcp.tool()
+async def set_slide_layout(slide_index: int, layout_index: int, presentation_name: Optional[str] = None) -> dict:
+    """Change the layout of an existing slide. Use list_slide_layouts to see available layouts.
+    
+    Args:
+        slide_index: 1-based slide number.
+        layout_index: 1-based layout index.
+    """
+    try:
+        return await asyncio.to_thread(set_slide_layout_sync, slide_index, layout_index, presentation_name)
+    except Exception as e:
+        if isinstance(e, ToolError): raise
+        raise ToolError(f"Failed: {e}") from e
+
 
 # ============================================================================
 # Media Tools
@@ -413,6 +532,21 @@ async def delete_comment(slide_index: int, comment_index: int, presentation_name
         if isinstance(e, ToolError): raise
         raise ToolError(f"Failed: {e}") from e
 
+@mcp.tool()
+async def reply_to_comment(slide_index: int, comment_index: int, text: str, author: str = "", author_initials: str = "", presentation_name: Optional[str] = None) -> dict:
+    """Reply to an existing comment on a slide.
+    
+    Args:
+        slide_index: 1-based slide number.
+        comment_index: 1-based index of the comment to reply to.
+        text: Reply text.
+    """
+    try:
+        return await asyncio.to_thread(reply_to_comment_sync, slide_index, comment_index, text, author, author_initials, presentation_name)
+    except Exception as e:
+        if isinstance(e, ToolError): raise
+        raise ToolError(f"Failed: {e}") from e
+
 
 # ============================================================================
 # Advanced Tools
@@ -432,6 +566,20 @@ async def save_presentation(presentation_name: Optional[str] = None) -> dict:
     """Save the active presentation."""
     try:
         return await asyncio.to_thread(save_presentation_sync, presentation_name)
+    except Exception as e:
+        if isinstance(e, ToolError): raise
+        raise ToolError(f"Failed: {e}") from e
+
+@mcp.tool()
+async def close_presentation(save: bool = True, presentation_name: Optional[str] = None) -> dict:
+    """Close a presentation. Optionally save before closing.
+    
+    Args:
+        save: Whether to save before closing. Default True.
+        presentation_name: Name of presentation to close. None = active.
+    """
+    try:
+        return await asyncio.to_thread(close_presentation_sync, save, presentation_name)
     except Exception as e:
         if isinstance(e, ToolError): raise
         raise ToolError(f"Failed: {e}") from e

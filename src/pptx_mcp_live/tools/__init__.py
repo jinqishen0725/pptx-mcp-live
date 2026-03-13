@@ -4,6 +4,7 @@ from .inspection import (
     get_slide_info_sync,
     inspect_presentation_sync,
     list_open_presentations_sync,
+    list_slide_layouts_sync,
 )
 from .readers import (
     get_comments_sync,
@@ -26,13 +27,16 @@ from .formatters import (
     set_slide_background_sync,
 )
 from .layout import (
+    add_shape_sync,
     align_shapes_sync,
     arrange_shape_sync,
+    delete_shape_sync,
     distribute_shapes_sync,
     group_shapes_sync,
     move_shape_sync,
     resize_shape_sync,
     rotate_shape_sync,
+    set_slide_layout_sync,
 )
 from .media import (
     add_chart_sync,
@@ -47,6 +51,13 @@ from .export import (
 from .comments import (
     add_comment_sync,
     delete_comment_sync,
+    get_all_comments_sync,
+    reply_to_comment_sync,
+)
+from .advanced import (
+    close_presentation_sync,
+    find_replace_sync,
+    save_presentation_sync,
 )
 from .advanced import (
     find_replace_sync,

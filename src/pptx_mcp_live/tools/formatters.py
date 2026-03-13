@@ -16,13 +16,15 @@ def format_text_sync(
     font_size: Optional[float] = None,
     font_color: Optional[str] = None,
     alignment: Optional[str] = None,
+    paragraph_index: Optional[int] = None,
     presentation_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Format text in a shape.
+    """Format text in a shape, optionally targeting a specific paragraph.
 
     Args:
         font_color: Hex color like "#FF0000" for red.
         alignment: "left", "center", "right", "justify".
+        paragraph_index: 1-based paragraph index. None = format all text.
     """
     app = get_powerpoint()
     pres = get_presentation(app, presentation_name)
@@ -32,7 +34,17 @@ def format_text_sync(
     if not shape.HasTextFrame:
         raise ToolError(f"Shape '{shape_ref}' does not contain text.")
 
-    tr = shape.TextFrame.TextRange
+    # Determine the text range to format
+    if paragraph_index is not None:
+        para_count = shape.TextFrame.TextRange.Paragraphs().Count
+        if paragraph_index < 1 or paragraph_index > para_count:
+            raise ToolError(
+                f"Paragraph index {paragraph_index} out of range (1-{para_count})."
+            )
+        tr = shape.TextFrame.TextRange.Paragraphs(paragraph_index)
+    else:
+        tr = shape.TextFrame.TextRange
+
     changes = []
 
     if bold is not None:
@@ -64,17 +76,22 @@ def format_text_sync(
         val = align_map.get(alignment.lower())
         if val is None:
             raise ToolError(f"Invalid alignment '{alignment}'. Use: left, center, right, justify.")
-        for i in range(1, tr.Paragraphs().Count + 1):
-            tr.Paragraphs(i).ParagraphFormat.Alignment = val
+        if paragraph_index is not None:
+            tr.ParagraphFormat.Alignment = val
+        else:
+            for i in range(1, tr.Paragraphs().Count + 1):
+                tr.Paragraphs(i).ParagraphFormat.Alignment = val
         changes.append(f"alignment={alignment}")
 
+    scope = f"paragraph {paragraph_index}" if paragraph_index else "all text"
     return {
         "success": True,
         "presentation": pres.Name,
         "slide_index": slide_index,
         "shape_name": shape.Name,
+        "scope": scope,
         "changes": changes,
-        "message": f"Formatted text on '{shape.Name}': {', '.join(changes)}",
+        "message": f"Formatted {scope} on '{shape.Name}': {', '.join(changes)}",
     }
 
 

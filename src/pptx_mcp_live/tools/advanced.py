@@ -84,3 +84,36 @@ def save_presentation_sync(
         "path": pres.FullName,
         "message": f"Presentation '{pres.Name}' saved.",
     }
+
+
+def close_presentation_sync(
+    save: bool = True,
+    presentation_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Close a presentation.
+
+    Args:
+        save: Whether to save before closing. Default True.
+        presentation_name: Name of presentation to close. None = active.
+    """
+    app = get_powerpoint()
+    pres = get_presentation(app, presentation_name)
+    name = pres.Name
+    path = pres.FullName
+
+    if save:
+        try:
+            pres.Save()
+        except Exception:
+            pass  # May fail for new unsaved presentations
+
+    pres.Close()
+
+    return {
+        "success": True,
+        "closed": name,
+        "path": path,
+        "saved": save,
+        "remaining_presentations": app.Presentations.Count,
+        "message": f"Presentation '{name}' closed{' (saved)' if save else ' (without saving)'}.",
+    }

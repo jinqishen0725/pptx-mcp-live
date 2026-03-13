@@ -72,7 +72,7 @@ def get_slide_info_sync(
     slide_index: int,
     presentation_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Get detailed info about a specific slide including all shapes."""
+    """Get detailed info about a specific slide including all shapes with font details."""
     app = get_powerpoint()
     pres = get_presentation(app, presentation_name)
     slide = get_slide(pres, slide_index)
@@ -90,10 +90,39 @@ def get_slide_info_sync(
             "height_inches": round(points_to_inches(shape.Height), 2),
         }
 
-        # Text content
+        # Text content and font details
         if shape.HasTextFrame:
             try:
                 shape_info["text"] = shape.TextFrame.TextRange.Text
+                # Get font details from the first run
+                tr = shape.TextFrame.TextRange
+                font_info = {}
+                try:
+                    font_info["name"] = tr.Font.Name
+                except Exception:
+                    pass
+                try:
+                    font_info["size"] = tr.Font.Size
+                except Exception:
+                    pass
+                try:
+                    font_info["bold"] = bool(tr.Font.Bold)
+                except Exception:
+                    pass
+                try:
+                    font_info["italic"] = bool(tr.Font.Italic)
+                except Exception:
+                    pass
+                try:
+                    rgb_int = tr.Font.Color.RGB
+                    r = rgb_int & 0xFF
+                    g = (rgb_int >> 8) & 0xFF
+                    b = (rgb_int >> 16) & 0xFF
+                    font_info["color"] = f"#{r:02X}{g:02X}{b:02X}"
+                except Exception:
+                    pass
+                if font_info:
+                    shape_info["font"] = font_info
             except Exception:
                 shape_info["text"] = None
 
@@ -117,6 +146,39 @@ def get_slide_info_sync(
         "shape_count": slide.Shapes.Count,
         "shapes": shapes,
         "notes": notes_text,
+    }
+
+
+def list_slide_layouts_sync(
+    presentation_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """List all available slide layouts with names and indices.
+
+    Returns layout names and indices that can be used with add_slide or set_slide_layout.
+    """
+    app = get_powerpoint()
+    pres = get_presentation(app, presentation_name)
+
+    layouts = []
+    for i in range(1, pres.SlideMaster.CustomLayouts.Count + 1):
+        layout = pres.SlideMaster.CustomLayouts(i)
+        # Count placeholders
+        placeholder_count = 0
+        try:
+            placeholder_count = layout.Placeholders.Count
+        except Exception:
+            pass
+        layouts.append({
+            "index": i,
+            "name": layout.Name,
+            "placeholder_count": placeholder_count,
+        })
+
+    return {
+        "success": True,
+        "presentation": pres.Name,
+        "layouts": layouts,
+        "count": len(layouts),
     }
 
 
